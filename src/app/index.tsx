@@ -1,98 +1,183 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useHabitos, MAX_HABITOS } from '@/hooks/use-habitos';
+import { HabitoItem } from '@/components/habito-item';
+import { BarraProgreso } from '@/components/barra-progreso';
+import { COLORES } from '@/constants/colores-habitos';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+const EMOJIS_DISPONIBLES = ['⭐', '📖', '💧', '🧘', '💪', '✍️', '🥗', '😴', '🎮', '💊', '🎶', '💼', '🛀', '🛏️'];
 
 export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+  const {
+    habitos,
+    cargando,
+    completados,
+    total,
+    porcentaje,
+    alternarHabito,
+    agregarHabito,
+    eliminarHabito,
+  } = useHabitos();
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+  const [textoNuevo, setTextoNuevo] = useState('');
+  const [emojiElegido, setEmojiElegido] = useState('⭐');
+  const [mostrarInput, setMostrarInput] = useState(false);
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+  const confirmarAgregar = () => {
+    agregarHabito(textoNuevo, emojiElegido);
+    setTextoNuevo('');
+    setEmojiElegido('⭐');
+    setMostrarInput(false);
+  };
 
-        {Platform.OS === 'web' && <WebBadge />}
+  if (cargando) {
+    return (
+      <SafeAreaView style={[estilos.pantalla, estilos.centrado]}>
+        <ActivityIndicator size="large" color={COLORES.acento} />
       </SafeAreaView>
-    </ThemedView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={estilos.pantalla}>
+      <StatusBar barStyle="light-content" />
+
+      <Text style={estilos.tituloApp}>📚To-Do</Text>
+ 
+      <FlatList
+        data={habitos}
+        keyExtractor={(habito) => habito.id}
+        contentContainerStyle={estilos.lista}
+        ListHeaderComponent={
+          <BarraProgreso completados={completados} total={total} porcentaje={porcentaje} />
+        }
+        renderItem={({ item }) => (
+          <HabitoItem
+            habito={item}
+            onPress={() => alternarHabito(item.id)}
+            onLongPress={() => eliminarHabito(item.id)}
+          />
+        )}
+        ListEmptyComponent={
+          <Text style={estilos.vacio}>Agrega tu primer hábito para empezar el día.</Text>
+        }
+        ListFooterComponent={
+          <View style={estilos.pie}>
+            {mostrarInput ? (
+              <View style={estilos.bloqueFormulario}>
+                <View style={estilos.filaEmojis}>
+                  {EMOJIS_DISPONIBLES.map((emoji) => (
+                    <Pressable
+                      key={emoji}
+                      onPress={() => setEmojiElegido(emoji)}
+                      style={[
+                        estilos.chipEmoji,
+                        emoji === emojiElegido && estilos.chipEmojiSeleccionado,
+                      ]}
+                    >
+                      <Text style={estilos.textoChipEmoji}>{emoji}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <View style={estilos.filaInput}>
+                  <TextInput
+                    value={textoNuevo}
+                    onChangeText={setTextoNuevo}
+                    placeholder="Nombre del hábito"
+                    placeholderTextColor={COLORES.textoSuave}
+                    style={estilos.input}
+                    autoFocus
+                    onSubmitEditing={confirmarAgregar}
+                    returnKeyType="done"
+                  />
+                  <Pressable style={estilos.botonGuardar} onPress={confirmarAgregar}>
+                    <Text style={estilos.textoBotonGuardar}>Guardar</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable
+                style={[estilos.boton, total >= MAX_HABITOS && estilos.botonInactivo]}
+                disabled={total >= MAX_HABITOS}
+                onPress={() => setMostrarInput(true)}
+              >
+                <Text style={estilos.textoBoton}>
+                  {total >= MAX_HABITOS
+                    ? `Máximo ${MAX_HABITOS} hábitos`
+                    : 'Agregar nuevo hábito'}
+                </Text>
+              </Pressable>
+            )}
+            <Text style={estilos.ayuda}>
+              Toca un hábito para marcarlo. Mantén presionado para eliminarlo.
+            </Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
+const estilos = StyleSheet.create({
+  pantalla: { flex: 1, backgroundColor: COLORES.fondo },
+  centrado: { justifyContent: 'center', alignItems: 'center' },
+  tituloApp: {
+    color: COLORES.texto,
+    fontSize: 22,
+    fontWeight: '700',
     textAlign: 'center',
+    paddingVertical: 16,
   },
-  code: {
-    textTransform: 'uppercase',
+  lista: { paddingHorizontal: 16, paddingBottom: 32 },
+  vacio: { color: COLORES.textoSuave, textAlign: 'center', marginVertical: 24 },
+  pie: { marginTop: 14 },
+  bloqueFormulario: { gap: 10 },
+  filaEmojis: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chipEmoji: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: COLORES.fila,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  chipEmojiSeleccionado: { borderColor: COLORES.acento },
+  textoChipEmoji: { fontSize: 20 },
+  boton: {
+    backgroundColor: COLORES.acento,
+    borderRadius: 26,
+    paddingVertical: 15,
+    alignItems: 'center',
   },
+  botonInactivo: { backgroundColor: COLORES.borde },
+  textoBoton: { color: COLORES.fondo, fontSize: 15, fontWeight: '700' },
+  filaInput: { flexDirection: 'row', gap: 10 },
+  input: {
+    flex: 1,
+    backgroundColor: COLORES.fila,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: COLORES.texto,
+  },
+  botonGuardar: {
+    backgroundColor: COLORES.acento,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+  },
+  textoBotonGuardar: { color: COLORES.fondo, fontWeight: '700' },
+  ayuda: { color: COLORES.textoSuave, fontSize: 12, textAlign: 'center', marginTop: 12 },
 });
