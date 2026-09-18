@@ -25,8 +25,6 @@ export function useHabitos() {
     cargar();
   }, []);
 
-  // Guardar en cada cambio (el `if (cargando) return` evita
-  // pisar los datos guardados con el arreglo vacío del primer render)
   useEffect(() => {
     if (cargando) return;
     AsyncStorage.setItem(CLAVE_STORAGE, JSON.stringify(habitos)).catch((error) =>
